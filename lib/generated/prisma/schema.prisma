@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Clinica {
+  id        String   @id @default(uuid())
+  nome      String
+  cnpj      String   @unique
+  telefone  String
+  createdAt DateTime @default(now())
+
+  usuarios  Usuario[]
+  pacientes Paciente[]
+  conversas Conversa[]
+}
+
+model Usuario {
+  id          String    @id @default(uuid())
+  clinicaId   String
+  nome        String
+  email       String    @unique
+  senhaHash   String
+  papel       String // admin | atendente
+  ultimoLogin DateTime?
+  createdAt   DateTime  @default(now())
+
+  clinica   Clinica    @relation(fields: [clinicaId], references: [id])
+  conversas Conversa[]
+  mensagens Mensagem[]
+  logs      LogAcao[]
+}
+
+model Paciente {
+  id             String    @id @default(uuid())
+  clinicaId      String
+  nome           String
+  telefone       String    @unique
+  cpf            String?
+  dataNascimento DateTime?
+  createdAt      DateTime  @default(now())
+
+  clinica   Clinica    @relation(fields: [clinicaId], references: [id])
+  conversas Conversa[]
+}
+
+model Conversa {
+  id                       String    @id @default(uuid())
+  pacienteId               String
+  clinicaId                String
+  status                   String // mensagem_recebida, agendado, em_procedimento, com_retorno
+  ultimoContatoEm          DateTime?
+  responsavelAtendimentoId String?
+
+  paciente               Paciente   @relation(fields: [pacienteId], references: [id])
+  clinica                Clinica    @relation(fields: [clinicaId], references: [id])
+  responsavelAtendimento Usuario?   @relation(fields: [responsavelAtendimentoId], references: [id])
+  mensagens              Mensagem[]
+  logs                   LogAcao[]
+}
+
+model Mensagem {
+  id            String    @id @default(uuid())
+  conversaId    String
+  autorTipo     String // paciente | usuario | ia
+  autorId       String?
+  conteudo      String
+  tipo          String // texto, imagem, etc
+  whatsappMsgId String?
+  recebidaEm    DateTime?
+  criadaEm      DateTime  @default(now())
+
+  conversa Conversa          @relation(fields: [conversaId], references: [id])
+  autor    Usuario?          @relation(fields: [autorId], references: [id])
+  sugestao MensagemSugestao?
+}
+
+model MensagemSugestao {
+  id               String   @id @default(uuid())
+  mensagemId       String   @unique
+  conteudoSugerido String
+  modeloIa         String
+  geradoEm         DateTime @default(now())
+
+  mensagem Mensagem @relation(fields: [mensagemId], references: [id])
+}
+
+model LogAcao {
+  id         String   @id @default(uuid())
+  usuarioId  String
+  conversaId String?
+  tipoAcao   String
+  dados      Json
+  createdAt  DateTime @default(now())
+
+  usuario  Usuario   @relation(fields: [usuarioId], references: [id])
+  conversa Conversa? @relation(fields: [conversaId], references: [id])
+}

@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model agent_control {
+  numero            String   @id @db.VarChar(50)
+  agente_ativo      Boolean  @default(true)
+  datehora          DateTime @db.Timestamptz(6)
+  ignorar_automacao Boolean?
+}
+
+model consultas {
+  id          Int        @id @default(autoincrement())
+  medico_id   Int?
+  data_hora   DateTime   @db.Timestamp(6)
+  tipo        String
+  status      String     @default("agendado")
+  paciente_id String?
+  medicos     medicos?   @relation(fields: [medico_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pacientes   pacientes? @relation(fields: [paciente_id], references: [telefone], onDelete: NoAction, onUpdate: NoAction, map: "fk_consultas_paciente")
+}
+
+model conversations {
+  id            Int       @id @default(autoincrement())
+  telefone_user String
+  messages      Json
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model documents {
+  id        BigInt                 @id @default(autoincrement())
+  text      String
+  metadata  Json?
+  embedding Unsupported("vector")?
+
+  @@index([embedding])
+}
+
+model especialidades {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  descricao String?
+  medicos   medicos[]
+}
+
+model medico_procedimentos {
+  id              Int           @id @default(autoincrement())
+  medico_id       Int
+  procedimento_id Int
+  medicos         medicos       @relation(fields: [medico_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  procedimentos   procedimentos @relation(fields: [procedimento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model medico_sintomas {
+  id         Int      @id @default(autoincrement())
+  medico_id  Int
+  sintoma_id Int
+  medicos    medicos  @relation(fields: [medico_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sintomas   sintomas @relation(fields: [sintoma_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model medicos {
+  id                   Int                    @id @default(autoincrement())
+  nome                 String
+  especialidade_id     Int?
+  id_calendario        String?
+  dia_atendimento      String?
+  metodo_pagamento     String?
+  consultas            consultas[]
+  medico_procedimentos medico_procedimentos[]
+  medico_sintomas      medico_sintomas[]
+  especialidades       especialidades?        @relation(fields: [especialidade_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model n8n_chat_histories {
+  id         Int    @id @default(autoincrement())
+  session_id String @db.VarChar(255)
+  message    Json
+}
+
+model pacientes {
+  id        Int         @default(autoincrement())
+  nome      String
+  telefone  String      @id(map: "pacientes_telefone_pkey")
+  consultas consultas[]
+}
+
+model procedimentos {
+  id                   Int                    @id @default(autoincrement())
+  nome                 String
+  preco                Decimal?               @db.Decimal(10, 2)
+  tempo_estimado       String?
+  descricao            String?
+  medico_procedimentos medico_procedimentos[]
+}
+
+model sintomas {
+  id              Int               @id @default(autoincrement())
+  nome            String
+  descricao       String?
+  medico_sintomas medico_sintomas[]
+}
+
+model app_clinica {
+  id           String         @id
+  nome         String
+  cnpj         String         @unique
+  telefone     String
+  createdAt    DateTime       @db.Timestamp(6)
+  app_conversa app_conversa[]
+  app_paciente app_paciente[]
+  app_usuario  app_usuario[]
+}
+
+model app_conversa {
+  id                       String         @id
+  pacienteId               String?
+  clinicaId                String?
+  status                   String
+  ultimoContatoEm          DateTime?      @db.Timestamp(6)
+  responsavelAtendimentoId String?
+  app_clinica              app_clinica?   @relation(fields: [clinicaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_paciente             app_paciente?  @relation(fields: [pacienteId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_usuario              app_usuario?   @relation(fields: [responsavelAtendimentoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_log_acao             app_log_acao[]
+  app_mensagem             app_mensagem[]
+}
+
+model app_log_acao {
+  id           String        @id
+  usuarioId    String?
+  conversaId   String?
+  tipoAcao     String
+  dados        Json          @db.Json
+  createdAt    DateTime      @db.Timestamp(6)
+  app_conversa app_conversa? @relation(fields: [conversaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_usuario  app_usuario?  @relation(fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model app_mensagem {
+  id                    String                 @id
+  conversaId            String?
+  autorTipo             String
+  autorId               String?
+  conteudo              String
+  tipo                  String
+  whatsappMsgId         String?
+  recebidaEm            DateTime?              @db.Timestamp(6)
+  criadaEm              DateTime               @db.Timestamp(6)
+  app_usuario           app_usuario?           @relation(fields: [autorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_conversa          app_conversa?          @relation(fields: [conversaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  app_mensagem_sugestao app_mensagem_sugestao?
+}
+
+model app_mensagem_sugestao {
+  id               String        @id
+  mensagemId       String?       @unique
+  conteudoSugerido String
+  modeloIa         String
+  geradoEm         DateTime      @db.Timestamp(6)
+  app_mensagem     app_mensagem? @relation(fields: [mensagemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model app_paciente {
+  id             String         @id
+  clinicaId      String?
+  nome           String?
+  telefone       String         @unique
+  cpf            String?
+  dataNascimento DateTime?      @db.Timestamp(6)
+  createdAt      DateTime       @db.Timestamp(6)
+  app_conversa   app_conversa[]
+  app_clinica    app_clinica?   @relation(fields: [clinicaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model app_usuario {
+  id           String         @id
+  clinicaId    String?
+  nome         String
+  email        String         @unique
+  senhaHash    String
+  papel        String
+  ultimoLogin  DateTime?      @db.Timestamp(6)
+  createdAt    DateTime       @db.Timestamp(6)
+  app_conversa app_conversa[]
+  app_log_acao app_log_acao[]
+  app_mensagem app_mensagem[]
+  app_clinica  app_clinica?   @relation(fields: [clinicaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
