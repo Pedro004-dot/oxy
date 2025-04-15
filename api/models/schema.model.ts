@@ -189,7 +189,7 @@ export const validateCPF = (cpf?: string): boolean => {
 
 // Funções auxiliares de validação de conversa
 export const validateConversaStatus = (status: string): boolean => {
-  const statusValidos = ['aguardando', 'em_atendimento', 'finalizado', 'arquivado'];
+  const statusValidos = ['atendimento', 'agendado'];
   return statusValidos.includes(status);
 };
 
